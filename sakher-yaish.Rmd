@@ -1,0 +1,217 @@
+---
+title: "CS 422"
+author: "Vijay K. Gurbani, Ph.D., Illinois Institute of Technology"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook: 
+    toc: yes
+    toc_float: yes
+---
+
+<!-- More information in R Markdown can be found at:
+1. https://www.ssc.wisc.edu/sscc/pubs/RFR/RFR_RMarkdown.html  This is 
+   the place to start since it is a short tutorial.
+2. https://rmarkdown.rstudio.com/index.html This contains a longer 
+   tutorial.  Take a look at the cheatsheet in 
+   https://rmarkdown.rstudio.com/lesson-15.html, it is a concise 
+   reference of R Markdown on two pages.
+<-->
+
+```{r}
+setwd("C:/Users/sakhe/Desktop/CS/CS422")
+
+```
+
+
+## Part(A)
+
+```{r}
+adult.train.df <- read.csv("adult-train.csv", header = TRUE)
+adult.test.df <- read.csv("adult-test.csv", header=TRUE)
+head(adult.test.df)
+
+adult.train.df <- adult.train.df[-which(apply(adult.train.df, 1, function(x) any(x == "?"))), ]
+adult.test.df <- adult.test.df[-which(apply(adult.test.df, 1, function(x) any( x=="?"))),]
+
+```
+## Part (b)
+```{r}
+library(rpart)
+library(rpart.plot)
+
+tree_model <- rpart(income ~ ., data = adult.train.df)
+summary(tree_model)
+rpart.plot(tree_model, type=4, extra=104, fallen.leaves = T)
+
+summary(tree_model)
+
+root_class <- predict(tree_model, type = "class")[1]
+cat("yes:",root_class)
+```
+
+## Part (2bi)
+```{r}
+cat(
+  paste("The 3 most important predictors are relationship, marital\n"),
+  paste("status, and capital gain.")
+)
+
+```
+## Part (2bii)
+```{r}
+
+cat(
+  paste("First split was done on relationship.\n"),
+  paste("Root node is <=50k class.\n"),
+  paste("The distributions are 0.75 for <=50k and 0.25 for >50k.")
+)
+
+```
+
+## Part(c)
+```{r}
+library(caret)
+pred <- predict(tree_model, adult.test.df, type="class")
+
+
+```
+## Part (ci)
+```{r}
+confMatrix <- confusionMatrix(pred, as.factor(adult.test.df$income))
+confMatrix
+cat(
+  paste("Balanced Accuracy: ", confMatrix$byClass["Balanced Accuracy"])
+)
+
+```
+
+## Part (bii)
+```{r}
+confMatrix <- confusionMatrix(pred, as.factor(adult.test.df$income))
+cat(
+  paste("Balanced Error Rate:", (1 - confMatrix$byClass["Balanced Accuracy"]))
+)
+
+```
+
+## Part (ciii)
+```{r}
+
+cat(
+  paste("Sensitivity:", confMatrix$byClass["Sensitivity"],"\n"),
+  paste("Specificity:", confMatrix$byClass["Specificity"])
+)
+```
+## Part (civ)
+```{r}
+library(ROCR)
+pred.rocr <- predict(tree_model, newdata=adult.test.df, type="prob")[,2]
+f.pred <- prediction(pred.rocr, adult.test.df$income)
+f.perf <- performance(f.pred, "tpr", "fpr")
+plot(f.perf, colorize=T, lwd=3)
+abline(0,1)
+auc <- performance(f.pred, measure = "auc")
+cat("AUC:", auc@y.values[[1]])
+```
+
+## part (d)
+
+```{r}
+printcp(tree_model)
+
+cat(
+  paste("Looking at the complexity table, we can see that the \n"),
+  paste("xerror(cross-validation error) stops significantly decreasing at CP=0.038294. That is where we should prune.")
+)
+
+
+```
+
+
+
+## Part(ei)
+```{r}
+set.seed(1122)
+
+cat(
+  paste("<=50k Observations:0.75"),
+  paste(">50k Observations: 0.25")
+)
+```
+
+
+## Part (eii)
+```{r}
+train_minority <- adult.train.df[adult.train.df$income == ">50K", ]
+train_majority <- adult.train.df[adult.train.df$income == "<=50K", ]
+
+
+n_minority <- nrow(train_minority)
+train_majority_sampled <- train_majority[sample(nrow(train_majority), n_minority, replace = FALSE), ]
+
+
+train_balanced <- rbind(train_majority_sampled, train_minority)
+```
+## Part (eiii)
+```{r}
+new_tree_model <- rpart(income ~ ., data = train_balanced)
+new_pred <- predict(new_tree_model, adult.test.df, type="class")
+
+new_confMatrix <- confusionMatrix(new_pred, as.factor(adult.test.df$income))
+new_confMatrix
+
+
+
+```
+
+## Part (eiii.i)
+```{r}
+cat(
+  paste("Balanced Accuracy: ", new_confMatrix$byClass["Balanced Accuracy"], "\n")
+)
+
+```
+
+## Part(eiii.ii)
+```{r}
+cat(
+  paste("Balanced Error Rate:", (1 - new_confMatrix$byClass["Balanced Accuracy"]),"\n")
+)
+
+```
+
+## Part(eiii.iii)
+```{r}
+cat(
+  paste("Sensitivity:", new_confMatrix$byClass["Sensitivity"],"\n"),
+  paste("Specificity:", new_confMatrix$byClass["Specificity"])
+)
+```
+
+
+
+
+## Part(eiii.iv)
+```{r}
+pred.rocr <- predict(new_tree_model, newdata=adult.test.df, type="prob")[,2]
+f.pred <- prediction(pred.rocr, adult.test.df$income)
+f.perf <- performance(f.pred, "tpr", "fpr")
+plot(f.perf, colorize=T, lwd=3)
+abline(0,1)
+auc <- performance(f.pred, measure = "auc")
+cat("AUC:", auc@y.values[[1]])
+
+```
+
+## Part (f)
+```{r}
+cat(
+  paste("The balanced accuracy is higher in the sampled new modle. The balanced error is lower in the new model. The sensitivity is lower for the new model and the specificity is higher for the new model. The AUC is slightly higher in the new model. The higher balanced accuracy and lower balanced error is definetly a good thing because it means that our model is more accurate. AUC being higher is a good thing too. sensitivity being lower might mean more generalization capablities.")
+)
+```
+
+
+
+
